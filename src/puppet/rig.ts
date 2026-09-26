@@ -14,9 +14,9 @@ interface RoleLayout {
 interface ArmSolution { shoulder: [number, number]; elbow: [number, number]; wrist: [number, number]; upper: number; fore: number }
 
 const assets: Record<RoleName, string> = {
-  sheng: '/assets/sheng-atlas.webp',
-  dan: '/assets/dan-atlas.webp',
-  jing: '/assets/jing-atlas.webp',
+  sheng: `${import.meta.env.BASE_URL}assets/sheng-atlas.webp`,
+  dan: `${import.meta.env.BASE_URL}assets/dan-atlas.webp`,
+  jing: `${import.meta.env.BASE_URL}assets/jing-atlas.webp`,
 };
 
 const layouts: Record<RoleName, RoleLayout> = {

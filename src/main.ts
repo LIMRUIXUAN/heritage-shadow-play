@@ -1,4 +1,5 @@
 import { AudioEngine } from './audio/audio-engine';
+import { musicTracks } from './audio/tracks';
 import { ExperienceMachine } from './experience/machine';
 import { applyLanguage, t } from './i18n';
 import { PoseController } from './puppet/pose-controller';
@@ -6,7 +7,7 @@ import { PuppetRig } from './puppet/rig';
 import type { ControlSideMode, DebugHandFilter, ExperienceState, GestureFrame, Language, RoleName } from './types';
 import { VisionAdapter } from './vision/adapter';
 import { drawDebugFrame } from './vision/debug-renderer';
-import { GestureStabilizer } from './vision/gestures';
+import { FistCueGate, GestureStabilizer } from './vision/gestures';
 
 const element = <T extends Element>(selector: string): T => {
   const found = document.querySelector<T>(selector);
@@ -30,6 +31,10 @@ const cueDetail = element<HTMLElement>('#cueDetail');
 const cueProgress = element<HTMLElement>('#cueProgress');
 const soundButton = element<HTMLButtonElement>('#soundButton');
 const soundIcon = element<HTMLElement>('#soundIcon');
+const musicSelect = element<HTMLSelectElement>('#musicSelect');
+const musicVolume = element<HTMLInputElement>('#musicVolume');
+const musicVolumeValue = element<HTMLOutputElement>('#musicVolumeValue');
+const musicStatus = element<HTMLElement>('#musicStatus');
 const debugButton = element<HTMLButtonElement>('#debugButton');
 const mirrorButton = element<HTMLButtonElement>('#mirrorButton');
 const debugHandSelect = element<HTMLSelectElement>('#debugHandSelect');
@@ -47,6 +52,7 @@ const audio = new AudioEngine();
 const poses = new PoseController();
 const rig = new PuppetRig(puppetCanvas);
 const stabilizer = new GestureStabilizer();
+const fistCue = new FistCueGate();
 
 let language = initialLanguage();
 let debugVisible = false;
@@ -62,23 +68,27 @@ let renderWindowStarted = performance.now();
 let animationFrame = 0;
 let transitionTimer = 0;
 let visionFailureHandled = false;
+let cameraStartRequest = 0;
 
 void rig.load('sheng').catch(() => setStatus('cameraError'));
 applyLanguage(language);
 
 machine.subscribe((next) => {
   experience.dataset.state = next;
+  audio.setActive(next !== 'landing');
   experience.dataset.mode = next === 'manual' || next === 'camera-error' ? 'manual' : 'camera';
   experience.dataset.curtain = ['opening', 'performing', 'manual', 'camera-error'].includes(next) ? 'open' : 'closed';
   poses.setManual(next === 'manual' || next === 'camera-error');
   poses.setVisible(['opening', 'performing', 'closing', 'manual', 'camera-error'].includes(next));
   if (next === 'closed') poses.reset();
   stabilizer.reset();
+  fistCue.reset();
   updateInterface(next);
 });
 
 function initialLanguage(): Language {
-  const saved = localStorage.getItem('shadow-play-language');
+  let saved: string | null = null;
+  try { saved = localStorage.getItem('shadow-play-language') } catch { /* Storage is optional. */ }
   if (saved === 'zh' || saved === 'en' || saved === 'ms') return saved;
   if (navigator.language.toLowerCase().startsWith('ms')) return 'ms';
   if (navigator.language.toLowerCase().startsWith('en')) return 'en';
@@ -140,26 +150,26 @@ async function startCamera(): Promise<void> {
   window.clearTimeout(transitionTimer);
   visionFailureHandled = false;
   if (!machine.transition('initializing')) return;
+  const request = ++cameraStartRequest;
   try {
     await vision.start(video);
-    if (machine.state !== 'initializing') return;
+    if (request !== cameraStartRequest || machine.state !== 'initializing') return;
     machine.transition('closed');
   } catch (error) {
     console.warn('Camera or MediaPipe initialization failed', error);
-    if (machine.state === 'initializing') machine.transition('camera-error');
+    if (request === cameraStartRequest && machine.state === 'initializing') machine.transition('camera-error');
   }
 }
 
 function enterManual(): void {
+  if (!machine.transition('manual')) return;
+  cameraStartRequest += 1;
   window.clearTimeout(transitionTimer);
   vision.stopCamera();
-  if (machine.state === 'landing') machine.transition('manual');
-  else machine.transition('manual');
 }
 
 function openCurtain(now: number): void {
   if (!machine.transition('opening', now)) return;
-  audio.playGong();
   gongFlash.classList.remove('is-active');
   void gongFlash.offsetWidth;
   gongFlash.classList.add('is-active');
@@ -170,12 +180,14 @@ function openCurtain(now: number): void {
 
 function closeCurtain(now: number): void {
   if (!machine.transition('closing', now)) return;
+  void audio.playCurtainCue('closing');
   transitionTimer = window.setTimeout(() => {
     if (machine.state === 'closing') machine.transition('closed');
   }, 820);
 }
 
 function returnHome(): void {
+  cameraStartRequest += 1;
   window.clearTimeout(transitionTimer);
   vision.stopCamera();
   audio.stop();
@@ -196,6 +208,7 @@ function handleGestureFrame(frame: GestureFrame, now: number): void {
   updateMappingSummary();
   if (machine.state === 'performing') cueDetail.textContent = detailForHands(frame.hands.length);
   const activeState = machine.canAcceptGesture(now) ? machine.state === 'closed' ? 'closed' : 'performing' : 'inactive';
+  if (fistCue.update(frame, activeState === 'closed')) void audio.playCurtainCue('opening');
   const result = stabilizer.update(frame, activeState);
   cueProgress.style.transform = `scaleX(${result.progress.toFixed(3)})`;
   if (machine.state === 'performing' && frame.crossCandidate) {
@@ -255,7 +268,32 @@ function updateSoundButton(): void {
   soundIcon.textContent = audio.soundEnabled ? '声' : '默';
   soundButton.setAttribute('aria-pressed', String(audio.soundEnabled));
   soundButton.setAttribute('aria-label', t(language, audio.soundEnabled ? 'soundOn' : 'soundOff'));
+  musicSelect.value = audio.selectedTrackId;
+  musicVolume.value = String(Math.round(audio.musicVolume * 100));
+  musicVolumeValue.value = `${musicVolume.value}%`;
+  musicVolume.setAttribute('aria-valuetext', `${musicVolume.value}%`);
+  musicStatus.hidden = !audio.soundEnabled || (!audio.curtainCueFailed && !['blocked', 'error'].includes(audio.playbackStatus));
+  musicStatus.textContent = t(language, audio.curtainCueFailed ? 'cueError' : audio.playbackStatus === 'blocked' ? 'musicBlocked' : 'musicError');
 }
+
+musicSelect.replaceChildren(...musicTracks.map((track) => {
+  const option = document.createElement('option');
+  option.value = track.id;
+  option.textContent = track.title;
+  return option;
+}));
+audio.onChange(updateSoundButton);
+musicSelect.addEventListener('change', () => { void audio.selectTrack(musicSelect.value) });
+musicVolume.addEventListener('input', () => audio.setVolume(Number(musicVolume.value) / 100));
+for (const kind of ['opening', 'closing'] as const) {
+  element<HTMLButtonElement>(`#preview${kind === 'opening' ? 'Opening' : 'Closing'}Cue`).addEventListener('click', () => {
+    void audio.unlock().then(() => audio.playCurtainCue(kind));
+  });
+}
+element<HTMLButtonElement>('#musicCreditsButton').addEventListener('click', () => {
+  dialog.showModal();
+  element<HTMLElement>('#musicCreditsHeading').focus();
+});
 
 element<HTMLButtonElement>('#enterButton').addEventListener('click', () => { void audio.unlock(); void startCamera() });
 element<HTMLButtonElement>('#manualEntryButton').addEventListener('click', () => { void audio.unlock(); enterManual() });
@@ -306,7 +344,7 @@ document.querySelectorAll<HTMLButtonElement>('.role-button').forEach((button) =>
 document.querySelectorAll<HTMLButtonElement>('[data-language]').forEach((button) => {
   button.addEventListener('click', () => {
     language = button.dataset.language as Language;
-    localStorage.setItem('shadow-play-language', language);
+    try { localStorage.setItem('shadow-play-language', language) } catch { /* Storage is optional. */ }
     applyLanguage(language);
     updateInterface();
   });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { GestureFrame, HandPose, Handedness, Point3D } from '../types';
-import { ConsecutiveGate, GestureStabilizer, TimedGate, actorHandednessFromMediaPipe, isCrossedArms, mapFrameControlSides, resolveControlSide } from './gestures';
+import { ConsecutiveGate, FistCueGate, GestureStabilizer, TimedGate, actorHandednessFromMediaPipe, isCrossedArms, mapFrameControlSides, resolveControlSide } from './gestures';
 
 const point = (x: number, y: number): Point3D => ({ x, y, z: 0 });
 const hand = (handedness: Handedness, x: number, y: number, gesture = 'None', score = 0): HandPose => ({
@@ -42,6 +42,59 @@ describe('gesture geometry', () => {
     expect(isCrossedArms([hand('left', 0.3, 0.5), hand('right', 0.7, 0.5)])).toBe(false);
     expect(isCrossedArms([hand('left', 0.52, 0.5), hand('right', 0.48, 0.5)])).toBe(false);
     expect(isCrossedArms([hand('left', 0.58, 0.25), hand('right', 0.41, 0.7)])).toBe(false);
+  });
+});
+
+describe('opening sound timing', () => {
+  const fist = frame([hand('left', 0.3, 0.5, 'Closed_Fist', 0.78)]);
+  const released = frame([]);
+
+  it('sounds on the first confident fist while the curtain still waits for eight frames', () => {
+    const cue = new FistCueGate();
+    const stabilizer = new GestureStabilizer();
+    for (let index = 0; index < 8; index += 1) {
+      const input = { ...fist, timestamp: index * 66 };
+      expect(cue.update(input, true)).toBe(index === 0);
+      expect(stabilizer.update(input, 'closed').confirmed).toBe(index === 7);
+    }
+  });
+
+  it('rejects weak fists and ignores gestures outside an active closed curtain', () => {
+    const cue = new FistCueGate();
+    expect(cue.update(frame([hand('left', 0.3, 0.5, 'Closed_Fist', 0.4)]), true)).toBe(false);
+    expect(cue.update(fist, false)).toBe(false);
+    const crossed = frame([hand('left', 0.58, 0.51), hand('right', 0.41, 0.55)]);
+    expect(cue.update(crossed, true)).toBe(false);
+    expect(cue.update(fist, true)).toBe(true);
+  });
+
+  it('does not replay after a brief recognition dropout', () => {
+    const cue = new FistCueGate();
+    expect(cue.update(fist, true)).toBe(true);
+    expect(cue.update({ ...released, timestamp: 66 }, true)).toBe(false);
+    expect(cue.update({ ...fist, timestamp: 132 }, true)).toBe(false);
+    expect(cue.update({ ...fist, timestamp: 4000 }, true)).toBe(false);
+  });
+
+  it('rearms after releasing for half a second without forcing the curtain open', () => {
+    const cue = new FistCueGate();
+    const stabilizer = new GestureStabilizer();
+    expect(cue.update(fist, true)).toBe(true);
+    expect(stabilizer.update(fist, 'closed').confirmed).toBe(false);
+    expect(cue.update({ ...released, timestamp: 100 }, true)).toBe(false);
+    expect(stabilizer.update(released, 'closed').progress).toBe(0);
+    const nextFist = { ...fist, timestamp: 600 };
+    expect(cue.update(nextFist, true)).toBe(true);
+    expect(stabilizer.update(nextFist, 'closed').confirmed).toBe(false);
+  });
+
+  it('allows a new opening sound after a state change', () => {
+    const cue = new FistCueGate();
+    expect(cue.update(fist, true)).toBe(true);
+    cue.reset();
+    expect(cue.update(fist, true)).toBe(true);
+    expect(cue.update(fist, false)).toBe(false);
+    expect(cue.update(fist, true)).toBe(true);
   });
 });
 

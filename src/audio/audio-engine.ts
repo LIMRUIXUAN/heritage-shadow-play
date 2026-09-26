@@ -1,77 +1,167 @@
+import { musicTrack, musicUrl } from './tracks';
+import { curtainCues, curtainCueUrl, type CurtainCueKind } from './curtain-cues';
+
+export type PlaybackStatus = 'idle' | 'playing' | 'blocked' | 'error';
+
+const readPreference = (key: string): string | null => {
+  try { return localStorage.getItem(key) } catch { return null }
+};
+const savePreference = (key: string, value: string): void => {
+  try { localStorage.setItem(key, value) } catch { /* Private browsing may disable storage. */ }
+};
+
 export class AudioEngine {
-  private context: AudioContext | null = null;
-  private enabled = true;
-  private wasPlayingBeforeHide = false;
-  private readonly music = new Audio('/assets/theatre-music.wav');
+  private enabled = readPreference('shadow-play-sound') !== 'off';
+  private active = false;
+  private unlocked = false;
+  private hidden = false;
+  private revision = 0;
+  private track = musicTrack(readPreference('shadow-play-music') ?? '');
+  private volume = Math.max(0, Math.min(1, Number(readPreference('shadow-play-volume') ?? '0.28') || 0));
+  private status: PlaybackStatus = 'idle';
+  private listener: (() => void) | null = null;
+  private readonly music = new Audio();
+  private readonly cueAudio = new Map<CurtainCueKind, HTMLAudioElement>();
+  private currentCue: HTMLAudioElement | null = null;
+  private cueRevision = 0;
+  private cueError = false;
 
   constructor() {
     this.music.loop = true;
-    this.music.preload = 'auto';
-    this.music.volume = 0.38;
+    this.music.preload = 'metadata';
+    this.music.volume = this.volume;
+    this.music.src = musicUrl(this.track);
+    this.music.addEventListener('error', () => this.setStatus('error'));
+    for (const cue of curtainCues) {
+      const audio = new Audio(curtainCueUrl(cue.file));
+      audio.preload = 'auto';
+      audio.volume = 0.7;
+      audio.loop = false;
+      audio.addEventListener('ended', () => {
+        if (this.currentCue === audio) this.stopCue();
+      });
+      audio.addEventListener('error', () => {
+        if (this.currentCue !== audio) return;
+        this.stopCue();
+        this.cueError = true;
+        this.listener?.();
+      });
+      this.cueAudio.set(cue.kind as CurtainCueKind, audio);
+    }
   }
 
   get soundEnabled(): boolean { return this.enabled }
+  get selectedTrackId(): string { return this.track.id }
+  get musicVolume(): number { return this.volume }
+  get playbackStatus(): PlaybackStatus { return this.status }
+  get curtainCueFailed(): boolean { return this.cueError }
+
+  onChange(listener: () => void): void { this.listener = listener }
+
+  private setStatus(status: PlaybackStatus): void {
+    this.status = status;
+    this.listener?.();
+  }
+
+  private async playMusic(): Promise<void> {
+    if (!this.enabled || !this.active || !this.unlocked || this.hidden) return;
+    const revision = this.revision;
+    try {
+      await this.music.play();
+      if (revision === this.revision) this.setStatus('playing');
+    } catch (error) {
+      if (revision !== this.revision || (error instanceof Error && error.name === 'AbortError')) return;
+      this.setStatus(error instanceof Error && error.name === 'NotAllowedError' ? 'blocked' : 'error');
+    }
+  }
 
   async unlock(): Promise<void> {
-    this.context ??= new AudioContext();
-    if (this.context.state === 'suspended') await this.context.resume();
-    if (this.enabled) await this.music.play().catch(() => undefined);
+    this.unlocked = true;
+    if (this.music.error) this.music.load();
+    await this.playMusic();
+  }
+
+  setActive(active: boolean): void {
+    this.active = active;
+    if (active) void this.playMusic();
+    else this.stop();
+  }
+
+  async selectTrack(id: string): Promise<void> {
+    this.revision += 1;
+    this.music.pause();
+    this.track = musicTrack(id);
+    this.music.src = musicUrl(this.track);
+    this.setStatus('idle');
+    savePreference('shadow-play-music', this.track.id);
+    await this.unlock();
+  }
+
+  setVolume(volume: number): void {
+    if (!Number.isFinite(volume)) return;
+    this.volume = Math.max(0, Math.min(1, volume));
+    this.music.volume = this.volume * (this.currentCue ? 0.2 : 1);
+    savePreference('shadow-play-volume', String(this.volume));
+    this.listener?.();
   }
 
   async toggle(): Promise<boolean> {
     this.enabled = !this.enabled;
+    savePreference('shadow-play-sound', this.enabled ? 'on' : 'off');
     if (this.enabled) await this.unlock();
-    else this.music.pause();
+    else { this.revision += 1; this.music.pause(); this.stopCue(); this.setStatus('idle') }
     return this.enabled;
   }
 
-  playGong(): void {
-    if (!this.enabled || !this.context) return;
-    const context = this.context;
-    const now = context.currentTime;
-    const master = context.createGain();
-    master.gain.setValueAtTime(0.0001, now);
-    master.gain.exponentialRampToValueAtTime(0.34, now + 0.018);
-    master.gain.exponentialRampToValueAtTime(0.0001, now + 1.85);
-    master.connect(context.destination);
-
-    [168, 243, 337, 472].forEach((frequency, index) => {
-      const oscillator = context.createOscillator();
-      const gain = context.createGain();
-      oscillator.type = index < 2 ? 'sine' : 'triangle';
-      oscillator.frequency.setValueAtTime(frequency, now);
-      oscillator.frequency.exponentialRampToValueAtTime(frequency * (index % 2 ? 0.91 : 0.96), now + 1.6);
-      gain.gain.value = [0.8, 0.5, 0.28, 0.16][index];
-      oscillator.connect(gain).connect(master);
-      oscillator.start(now + index * 0.004);
-      oscillator.stop(now + 1.9);
-    });
-
-    const noiseLength = Math.floor(context.sampleRate * 0.22);
-    const noiseBuffer = context.createBuffer(1, noiseLength, context.sampleRate);
-    const samples = noiseBuffer.getChannelData(0);
-    for (let index = 0; index < noiseLength; index += 1) samples[index] = (Math.random() * 2 - 1) * (1 - index / noiseLength);
-    const noise = context.createBufferSource();
-    const filter = context.createBiquadFilter();
-    const noiseGain = context.createGain();
-    noise.buffer = noiseBuffer;
-    filter.type = 'bandpass';
-    filter.frequency.value = 920;
-    filter.Q.value = 0.7;
-    noiseGain.gain.setValueAtTime(0.18, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24);
-    noise.connect(filter).connect(noiseGain).connect(master);
-    noise.start(now);
-  }
-
-  onVisibilityChange(hidden: boolean): void {
-    if (hidden) {
-      this.wasPlayingBeforeHide = !this.music.paused;
-      this.music.pause();
-    } else if (this.enabled && this.wasPlayingBeforeHide) {
-      void this.music.play().catch(() => undefined);
+  async playCurtainCue(kind: CurtainCueKind): Promise<void> {
+    if (!this.enabled || !this.active || !this.unlocked || this.hidden) return;
+    const cue = this.cueAudio.get(kind);
+    if (!cue) return;
+    this.stopCue();
+    const revision = this.cueRevision;
+    this.currentCue = cue;
+    this.cueError = false;
+    if (cue.error) cue.load();
+    cue.currentTime = 0;
+    this.music.volume = this.volume * 0.2;
+    this.listener?.();
+    try { await cue.play() }
+    catch (error) {
+      if (revision !== this.cueRevision) return;
+      this.stopCue();
+      if (error instanceof Error && error.name === 'AbortError') return;
+      this.cueError = true;
+      this.listener?.();
     }
   }
 
-  stop(): void { this.music.pause(); this.music.currentTime = 0 }
+  private stopCue(): void {
+    this.cueRevision += 1;
+    if (this.currentCue) {
+      this.currentCue.pause();
+      this.currentCue.currentTime = 0;
+    }
+    this.currentCue = null;
+    this.music.volume = this.volume;
+    this.listener?.();
+  }
+
+  onVisibilityChange(hidden: boolean): void {
+    this.hidden = hidden;
+    if (hidden) {
+      this.revision += 1;
+      this.music.pause();
+      this.stopCue();
+      this.setStatus('idle');
+    } else void this.playMusic();
+  }
+
+  stop(): void {
+    this.active = false;
+    this.revision += 1;
+    this.music.pause();
+    this.stopCue();
+    this.music.currentTime = 0;
+    this.setStatus('idle');
+  }
 }

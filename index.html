@@ -14,7 +14,7 @@
     <div id="experience" class="experience" data-state="landing" data-curtain="closed" data-mode="camera">
       <div class="paper-grain" aria-hidden="true"></div>
       <header class="topbar">
-        <button id="homeButton" class="brand" type="button" aria-label="回到首页">
+        <button id="homeButton" class="brand" type="button" data-i18n-aria="home" aria-label="回到首页">
           <span class="brand-seal" aria-hidden="true"><i>影</i></span>
           <span class="brand-copy"><strong data-i18n="title">掌上皮影</strong><small>GESTURE SHADOW PLAY</small></span>
         </button>
@@ -38,7 +38,7 @@
         <section class="theatre" aria-label="互动皮影戏台" data-i18n-aria="stageLabel">
           <div class="theatre-light" aria-hidden="true"></div>
           <div id="gongFlash" class="gong-flash" aria-hidden="true"></div>
-          <canvas id="puppetCanvas" class="puppet-canvas" aria-label="皮影角色"></canvas>
+          <canvas id="puppetCanvas" class="puppet-canvas" data-i18n-aria="puppet" aria-label="皮影角色"></canvas>
           <div class="curtain curtain-left" aria-hidden="true"><div class="curtain-folds"></div><span class="curtain-knot">吉</span></div>
           <div class="curtain curtain-right" aria-hidden="true"><div class="curtain-folds"></div><span class="curtain-knot">祥</span></div>
           <div class="proscenium" aria-hidden="true"><span class="proscenium-top"></span><span class="proscenium-left"></span><span class="proscenium-right"></span><span class="proscenium-bottom"></span></div>
@@ -71,6 +71,13 @@
             <div class="language-switcher" role="group" aria-label="Language"><button type="button" data-language="zh" aria-pressed="true">中</button><button type="button" data-language="en" aria-pressed="false">EN</button><button type="button" data-language="ms" aria-pressed="false">MS</button></div>
           </div>
         </footer>
+        <section class="music-controls" data-i18n-aria="musicSettings" aria-label="配乐设置">
+          <label class="music-track"><span data-i18n="musicLabel">配乐</span><select id="musicSelect"></select></label>
+          <label class="music-volume"><span data-i18n="musicVolume">配乐音量</span><input id="musicVolume" type="range" min="0" max="100" step="1" value="28" /><output id="musicVolumeValue" for="musicVolume">28%</output></label>
+          <button id="musicCreditsButton" class="music-credits-button" type="button" data-i18n="musicCredits">音乐来源与署名</button>
+          <div class="cue-previews"><span data-i18n="curtainCues">幕布锣鼓</span><button id="previewOpeningCue" class="music-credits-button" type="button" data-i18n="previewOpeningCue">试听开幕</button><button id="previewClosingCue" class="music-credits-button" type="button" data-i18n="previewClosingCue">试听闭幕</button></div>
+          <span id="musicStatus" class="music-status" role="status" hidden></span>
+        </section>
       </main>
       <section id="landing" class="landing" aria-labelledby="landingTitle">
         <div class="landing-curtain" aria-hidden="true"><span>皮影</span></div>
@@ -84,9 +91,10 @@
         </div>
       </section>
     </div>
-    <dialog id="knowledgeDialog" class="knowledge-dialog">
-      <div class="dialog-heading"><div><small data-i18n="archive">SHADOW PLAY ARCHIVE</small><h2 data-i18n="knowledgeTitle">皮影小志</h2></div><button id="closeKnowledgeButton" class="icon-button" type="button" data-i18n-aria="close">合</button></div>
+    <dialog id="knowledgeDialog" class="knowledge-dialog" aria-labelledby="knowledgeTitle">
+      <div class="dialog-heading"><div><small data-i18n="archive">SHADOW PLAY ARCHIVE</small><h2 id="knowledgeTitle" data-i18n="knowledgeTitle">皮影小志</h2></div><button id="closeKnowledgeButton" class="icon-button" type="button" data-i18n-aria="close">合</button></div>
       <div id="knowledgeContent" class="knowledge-content"></div>
+      <section class="music-credits"><h3 id="musicCreditsHeading" tabindex="-1" data-i18n="musicCredits">音乐来源与署名</h3><p data-i18n="musicContext">现代氛围配乐，用于数字体验，不是华县皮影传统唱腔录音。</p><div id="musicCreditsContent"></div></section>
     </dialog>
     <script type="module" src="/src/main.ts"></script>
   </body>

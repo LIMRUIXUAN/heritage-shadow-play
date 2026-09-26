@@ -4,11 +4,11 @@ type Listener = (next: ExperienceState, previous: ExperienceState) => void;
 
 const allowed: Record<ExperienceState, ExperienceState[]> = {
   landing: ['initializing', 'manual'],
-  initializing: ['closed', 'camera-error', 'landing'],
-  closed: ['opening', 'manual', 'initializing', 'landing'],
-  opening: ['performing', 'landing'],
-  performing: ['closing', 'manual', 'landing'],
-  closing: ['closed', 'landing'],
+  initializing: ['closed', 'camera-error', 'manual', 'landing'],
+  closed: ['opening', 'manual', 'initializing', 'camera-error', 'landing'],
+  opening: ['performing', 'manual', 'landing'],
+  performing: ['closing', 'manual', 'camera-error', 'landing'],
+  closing: ['closed', 'manual', 'landing'],
   manual: ['initializing', 'landing'],
   'camera-error': ['initializing', 'manual', 'landing'],
 };

@@ -1,0 +1,56 @@
+{
+  "verifiedAt": "2026-09-26",
+  "artist": "一才鑼鼓 The Gong Strikes One",
+  "artistUrl": "https://hkmusicminiatures.com/",
+  "license": "Public domain / demo recording reuse terms",
+  "licenseUrl": "https://hkmusicminiatures.com/public-domain-dedication-statement-with-copyright-guidelines/",
+  "processingTool": "FFmpeg 8.1.2, libmp3lame 128 kbps, 44.1 kHz",
+  "sources": [
+    {
+      "id": "mm1004",
+      "title": "Hong Kong Music Miniatures 1004",
+      "sourceUrl": "https://hkmusicminiatures.com/2025/03/06/mm1004/",
+      "downloadUrl": "https://hkmusicminiatures.com/wp-content/uploads/2025/02/1-04-1004.mp3",
+      "file": "sources/mm1004.mp3",
+      "bytes": 477851,
+      "sha256": "1b4b2d5d3075e96e646a31d5113343239496f23d4fee6d3f5d9e0460542c6ebc",
+      "performers": "LAM Yip (frame drum, hand gong); LUNG Lok Yun (tiger gong); DAI Rihui (cymbals)"
+    },
+    {
+      "id": "mm1031-gong",
+      "title": "Hong Kong Music Miniatures 1031 (version with gong)",
+      "sourceUrl": "https://hkmusicminiatures.com/2025/03/06/mm1031/",
+      "downloadUrl": "https://hkmusicminiatures.com/wp-content/uploads/2025/02/1-39-1031_1.mp3",
+      "file": "sources/mm1031-gong.mp3",
+      "bytes": 1194533,
+      "sha256": "7c5266b5196969552043ecad48fc9e94dfd8228a469d533342121711ac261b41",
+      "performers": "LAM Yip (frame drum, hand gong); LUNG Lok Yun (tiger gong); DAI Rihui (cymbals)"
+    }
+  ],
+  "cues": [
+    {
+      "id": "curtain-opening",
+      "kind": "opening",
+      "title": "Opening luogu — 1004 excerpt",
+      "sourceId": "mm1004",
+      "file": "curtain-opening.mp3",
+      "durationSeconds": 4,
+      "bytes": 65245,
+      "sha256": "5aea02b71ac17a49ba46051065ba823b65a083f99c03668930b772e47f083e3e",
+      "filter": "atrim=start=0.78:end=4.78,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.008,afade=t=out:st=3.8:d=0.2,loudnorm=I=-18:TP=-2:LRA=9",
+      "modifications": "Excerpt 0.78–4.78 s, fades, loudness normalization and MP3 re-encoding. Single playback on first confident fist detection before curtain opening."
+    },
+    {
+      "id": "curtain-closing",
+      "kind": "closing",
+      "title": "Closing luogu — 1031 gong version excerpt",
+      "sourceId": "mm1031-gong",
+      "file": "curtain-closing.mp3",
+      "durationSeconds": 4.45,
+      "bytes": 72351,
+      "sha256": "f22e5c70de20b72b7702df7cc758b89905a79518318b8e85f855cd3221fcaf0f",
+      "filter": "atrim=start=24.1:end=28.55,asetpts=PTS-STARTPTS,afade=t=in:st=0:d=0.008,afade=t=out:st=4.2:d=0.25,loudnorm=I=-18:TP=-2:LRA=9",
+      "modifications": "Excerpt 24.1–28.55 s, fades, loudness normalization and MP3 re-encoding. Single playback on curtain closing."
+    }
+  ]
+}

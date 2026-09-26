@@ -1,0 +1,46 @@
+{
+  "verifiedAt": "2026-09-26",
+  "license": "CC BY 4.0",
+  "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+  "tracks": [
+    {
+      "id": "guzheng-city",
+      "title": "Guzheng City",
+      "artist": "Kevin MacLeod",
+      "artistUrl": "https://incompetech.com/",
+      "sourceUrl": "https://incompetech.com/music/royalty-free/index.html?Search=Search&isrc=USUAN2100001",
+      "downloadUrl": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Guzheng%20City.mp3",
+      "file": "guzheng-city.mp3",
+      "durationSeconds": 114.077,
+      "bytes": 3654552,
+      "sha256": "7d117a43cad22ff05b32340f2bd331368c48342f503eab85b1e5c403043d4be6",
+      "modifications": "None; original MP3. Playback volume reduced and repeat enabled in the app."
+    },
+    {
+      "id": "imperial-china-cinematic",
+      "title": "Imperial China Cinematic",
+      "artist": "Shane Ivers",
+      "artistUrl": "https://www.silvermansound.com/",
+      "sourceUrl": "https://www.silvermansound.com/free-music/imperial-china-cinematic",
+      "downloadUrl": "https://www.silvermansound.com/wp-content/uploads/imperial-china-cinematic.mp3",
+      "file": "imperial-china-cinematic.mp3",
+      "durationSeconds": 201.665,
+      "bytes": 8070709,
+      "sha256": "4a8bf29f72af49ad3e031f2c4f6c4bc05af2b2fadc2013dccb4dbaa4e800bc54",
+      "modifications": "None; original MP3. Playback volume reduced and repeat enabled in the app."
+    },
+    {
+      "id": "asian-drums",
+      "title": "Asian Drums",
+      "artist": "Kevin MacLeod",
+      "artistUrl": "https://incompetech.com/",
+      "sourceUrl": "https://incompetech.com/music/royalty-free/index.html?Search=Search&isrc=USUAN1100396",
+      "downloadUrl": "https://incompetech.com/music/royalty-free/mp3-royaltyfree/Asian%20Drums.mp3",
+      "file": "asian-drums.mp3",
+      "durationSeconds": 138.553,
+      "bytes": 5662938,
+      "sha256": "c715f9f9af67505447e8083f50206799ec8563157aab6fdc80e7672698cc8a7d",
+      "modifications": "None; original MP3. Playback volume reduced and repeat enabled in the app."
+    }
+  ]
+}

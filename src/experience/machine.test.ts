@@ -28,4 +28,30 @@ describe('ExperienceMachine', () => {
     expect(machine.transition('manual', 30)).toBe(true);
     expect(machine.transition('initializing', 40)).toBe(true);
   });
+
+  it('recovers when inference fails during a performance', () => {
+    const machine = new ExperienceMachine();
+    machine.transition('initializing', 0);
+    machine.transition('closed', 100);
+    machine.transition('opening', 1400);
+    machine.transition('performing', 2220);
+    expect(machine.transition('camera-error', 2300)).toBe(true);
+    expect(machine.transition('initializing', 2400)).toBe(true);
+  });
+
+  it('lets manual controls interrupt loading and curtain animations', () => {
+    for (const state of ['initializing', 'opening', 'closing'] as const) {
+      const machine = new ExperienceMachine();
+      machine.transition('initializing', 0);
+      if (state !== 'initializing') {
+        machine.transition('closed', 100);
+        machine.transition('opening', 1400);
+      }
+      if (state === 'closing') {
+        machine.transition('performing', 2220);
+        machine.transition('closing', 3500);
+      }
+      expect(machine.transition('manual', 3600)).toBe(true);
+    }
+  });
 });

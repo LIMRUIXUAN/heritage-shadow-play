@@ -10,9 +10,11 @@ export class VisionAdapter {
   private worker: Worker | null = null;
   private workerReady: Promise<void> | null = null;
   private workerReadyState = false;
+  private cancelWorkerInit: (() => void) | null = null;
   private stream: MediaStream | null = null;
   private pending: PendingFrame | null = null;
   private nextFrameId = 1;
+  private startGeneration = 0;
   private controlSideMode: ControlSideMode = 'natural';
   private latestMetrics: VisionMetrics = { inferenceMs: 0, captureMs: 0, backend: 'worker' };
 
@@ -24,14 +26,27 @@ export class VisionAdapter {
 
   async start(video: HTMLVideoElement): Promise<void> {
     this.stopCamera();
+    const generation = this.startGeneration;
     if (!navigator.mediaDevices?.getUserMedia || typeof Worker === 'undefined' || typeof createImageBitmap === 'undefined') throw new Error('camera-or-worker-unavailable');
-    const [, stream] = await Promise.all([
-      this.loadWorker(),
-      navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } } }),
-    ]);
-    this.stream = stream;
-    video.srcObject = stream;
-    await video.play();
+    try {
+      const [, stream] = await Promise.all([
+        this.loadWorker(),
+        navigator.mediaDevices.getUserMedia({ audio: false, video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 24, max: 30 } } }).then((stream) => {
+          if (generation !== this.startGeneration) {
+            stream.getTracks().forEach((track) => track.stop());
+            throw new Error('camera-start-cancelled');
+          }
+          this.stream = stream;
+          return stream;
+        }),
+      ]);
+      if (generation !== this.startGeneration) return;
+      video.srcObject = stream;
+      await video.play();
+    } catch (error) {
+      if (generation === this.startGeneration) this.close();
+      throw error;
+    }
   }
 
   async sample(video: HTMLVideoElement, timestamp: number): Promise<GestureFrame | null> {
@@ -49,12 +64,15 @@ export class VisionAdapter {
   }
 
   stopCamera(): void {
+    this.startGeneration += 1;
     this.stream?.getTracks().forEach((track) => track.stop());
     this.stream = null;
   }
 
   close(): void {
     this.stopCamera();
+    this.cancelWorkerInit?.();
+    this.cancelWorkerInit = null;
     this.worker?.postMessage({ type: 'close' });
     this.worker?.terminate();
     this.worker = null;
@@ -69,11 +87,15 @@ export class VisionAdapter {
     this.worker = new Worker(new URL('./recognizer.worker.ts', import.meta.url), { type: 'module', name: 'shadow-play-vision' });
     this.workerReady = new Promise<void>((resolve, reject) => {
       if (!this.worker) { reject(new Error('worker-unavailable')); return }
+      const timeout = setTimeout(() => reject(new Error('vision-model-timeout')), 30000);
+      const ready = () => { clearTimeout(timeout); this.cancelWorkerInit = null; resolve() };
+      const failed = (error: Error) => { clearTimeout(timeout); this.cancelWorkerInit = null; reject(error) };
+      this.cancelWorkerInit = () => failed(new Error('vision-init-cancelled'));
       this.worker.addEventListener('message', (event: MessageEvent) => {
         const message = event.data;
         if (message.type === 'ready') {
           this.workerReadyState = true;
-          resolve();
+          ready();
           return;
         }
         if (message.type === 'result' && this.pending) {
@@ -89,7 +111,7 @@ export class VisionAdapter {
             const pending = this.pending;
             this.pending = null;
             pending.reject(error);
-          } else reject(error);
+          } else failed(error);
         }
       });
       this.worker.addEventListener('error', (event) => {
@@ -99,7 +121,7 @@ export class VisionAdapter {
           this.pending = null;
           pending.reject(error);
         }
-        reject(error);
+        failed(error);
       });
       this.worker.postMessage({ type: 'init', wasmUrl: WASM_URL, modelUrl: MODEL_URL });
     });

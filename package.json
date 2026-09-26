@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "music:fetch": "node scripts/download-music.mjs",
+    "cues:prepare": "node scripts/prepare-curtain-cues.mjs"
   },
   "devDependencies": {
     "typescript": "5.9.3",

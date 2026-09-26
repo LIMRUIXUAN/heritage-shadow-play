@@ -45,6 +45,30 @@ export function isClosedFist(frame: GestureFrame): boolean {
   return frame.hands.some((hand) => hand.gesture === 'Closed_Fist' && hand.score >= FIST_CONFIDENCE);
 }
 
+// Sound responds immediately; curtain movement still uses the stability gate.
+export class FistCueGate {
+  private latched = false;
+  private releasedAt: number | null = null;
+
+  update(frame: GestureFrame, active: boolean): boolean {
+    if (!active) {
+      this.reset();
+      return false;
+    }
+    if (!isClosedFist(frame)) {
+      this.releasedAt ??= frame.timestamp;
+      return false;
+    }
+    if (this.releasedAt !== null && frame.timestamp - this.releasedAt >= 500) this.latched = false;
+    this.releasedAt = null;
+    if (this.latched) return false;
+    this.latched = true;
+    return true;
+  }
+
+  reset(): void { this.latched = false; this.releasedAt = null }
+}
+
 export class ConsecutiveGate {
   private count = 0;
   private latched = false;
